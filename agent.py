@@ -1,4 +1,7 @@
 """
+TODO: generate random believeable comments for the script.
+"""
+"""
     Discord bot client v0.1 by INSERT_NAME
     Used for server management, logging, and utility functions.
     DO NOT REMOVE!
