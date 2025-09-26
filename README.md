@@ -12,6 +12,9 @@ One of the knocks against script-based C2 frameworks is that they are more diffi
 ## What if Python isn't installed on my target?
 IDK, maybe install it yourself? Sounds like a good use for a stage 0. You could also bring along a valid, signed, statically-linked version of python to do the heavy lifting.
 
+## This uses third-party python modules that aren't installed on my target.
+That's a fair criticism, and I'm still trying to work out the cleanest solution. Current ideas include having a python core approach to dynamically loading modules, or just running the commands to do the pip installs.
+
 ## Wait, I have a better idea. I'll use PyInstaller or Nuitka to compile my python into an unsigned executable that also includes a python bootloader. That will never get caught.
 [Please see here for my response](https://www.youtube.com/watch?v=5hfYJsQAhl0)
 
