@@ -10,7 +10,7 @@ Lenny aims to be unique in that it is only written in scripting languages and is
 One of the knocks against script-based C2 frameworks is that they are more difficult to deploy. Sure, it's easy to drop an executable and be on with your day, but executables are also subject to heavier scrutiny (fork/exec syscalls tend to be the most heavily monitored). Also come on guys, we are hackers, let's just get good and work a little harder.
 
 ## What if Python isn't installed on my target?
-IDK, maybe install it yourself? Sounds like a good use for a stage 0.
+IDK, maybe install it yourself? Sounds like a good use for a stage 0. You could also bring along a valid, signed, statically-linked version of python to do the heavy lifting.
 
 ## Wait, I have a better idea. I'll use PyInstaller or Nuitka to compile my python into an unsigned executable that also includes a python bootloader. That will never get caught.
 [Please see here for my response](https://www.youtube.com/watch?v=5hfYJsQAhl0)
