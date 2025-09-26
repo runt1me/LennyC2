@@ -15,6 +15,8 @@ IDK, maybe install it yourself? Sounds like a good use for a stage 0.
 ## Wait, I have a better idea. I'll use PyInstaller or Nuitka to compile my python into an unsigned executable that also includes a python bootloader. That will never get caught.
 [Please see here for my response](https://www.youtube.com/watch?v=5hfYJsQAhl0)
 
+OK, maybe that's too spicy of a response, but in all seriousness, I would generally recommend against this for actual red team engagements. For the record, I love PyInstaller and often use it in non-pen-testing scenarios. However, PyInstaller-generated binaries often get rolled up in heuristic detections, even if they are signed. And, it goes against the entire philosophy of this C2 framework by bloating a lightweight script with all of the weight of a python executable and bootstrapper. I'm not saying you can't do it, but our loveable mascot, Lenny, will be truly saddened by it.
+
 ## Mitigating against malicious scripts
 To mitigate a malicious python script, heuristic detection actually needs to be dialed in really well. I am skeptical that many (any?) out-of-the-box EDRs will be tuned well enough to catch a python script that's only real signatureable characteristics are basic file I/O, running commands, and making HTTPS requests to well-known domains. I am not ruling out that it's possible, of course -- just difficult :)
 
