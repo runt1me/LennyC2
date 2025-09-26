@@ -153,7 +153,7 @@ def process_command(cmd_str):
     commands = {
         "exec": execute_command,
         "get": get_content,
-        "exit": lambda _: exit()
+        "exit": lambda _: exit
     }
 
     if cmd in commands:
