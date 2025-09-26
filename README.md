@@ -12,6 +12,9 @@ One of the knocks against script-based C2 frameworks is that they are more diffi
 ## What if Python isn't installed on my target?
 IDK, maybe install it yourself? Sounds like a good use for a stage 0.
 
+## Wait, I have a better idea. I'll use PyInstaller or Nuitka to compile my python into an unsigned executable that also includes a python bootloader. That will never get caught.
+(Please see here for my response)[https://www.youtube.com/watch?v=5hfYJsQAhl0]
+
 ## Mitigating against malicious scripts
 To mitigate a malicious python script, heuristic detection actually needs to be dialed in really well. I am skeptical that many (any?) out-of-the-box EDRs will be tuned well enough to catch a python script that's only real signatureable characteristics are basic file I/O, running commands, and making HTTPS requests to well-known domains. I am not ruling out that it's possible, of course -- just difficult :)
 
