@@ -261,8 +261,6 @@ def process_command(cmd_str):
     cmd = parts[0].lower()
     arg = parts[1] if len(parts) > 1 else None
 
-    # TODO: more commands
-    # Make ls / lt aliases for python dirlist
     commands = {
         "exec": execute_command,
         "get": get_content,
