@@ -14,7 +14,7 @@ Features include:
 If needed, run the stager.ps1 script to install python:
 `PS > .\stager.ps1`
 
-Create a file, `secrets.txt`, with two lines. The DISCORD_USER_ID is the user ID for the account that will be issuing commands to the agent. The DISCORD_BOT_TOKEN is just the normal discord bot token.
+As LennyC2 is intended to be deployed to (authorized) pen-test/red-team targets, and not our own systems, discord-server related secrets are read from STDIN in an attempt to protect them. The secrets will live in memory in the python process (they must in order for the program to work), but will not be easily visible on process command lines or in logs. First, create a file, `secrets.txt`, with two lines. The DISCORD_USER_ID is the user ID for the account that will be issuing commands to the agent. The DISCORD_BOT_TOKEN is just the normal discord bot token. More information on how to find these values can be found [here](https://infosecwriteups.com/using-discord-as-a-c2-cf90b3480689)
 ```
 DISCORD_USER_ID
 DISCORD_BOT_TOKEN
@@ -22,6 +22,8 @@ DISCORD_BOT_TOKEN
 
 Then, deploy and run the agent:
 `python agent.py < secrets.txt`
+
+You can delete `secrets.txt` once the agent has started.
 
 If everything worked to this point, you should get a callback in a new channel in your Discord server.
 
