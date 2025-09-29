@@ -13,6 +13,7 @@ import os
 import platform
 import random
 import re
+import shutil
 import socket
 import string
 import subprocess
@@ -20,9 +21,9 @@ import sys
 from datetime import timedelta
 from pathlib import Path
 
-ADDED = []
+DEPS_LOCATION = ".deps"
 
-def ensure_wheel(package_name, import_name=None, dest=".deps"):
+def ensure_wheel(package_name, import_name=None, dest=None):
     dest_path = Path(dest)
     dest_path.mkdir(exist_ok=True)
 
@@ -35,12 +36,12 @@ def ensure_wheel(package_name, import_name=None, dest=".deps"):
     try:
         return importlib.import_module(import_name)
     except ImportError:
+        # Requires pip install rather than download because of the way its submodules are setup
         if "discord" in package_name:
             subprocess.check_call([
                 sys.executable, "-m", "pip", "install",
                 "--upgrade", "--target", str(dest_path), package_name
             ])
-            # Need to handle discord differently due to the way it does submodule imports
         else:
             # Download wheel into current directory
             subprocess.check_call([
@@ -52,13 +53,12 @@ def ensure_wheel(package_name, import_name=None, dest=".deps"):
             w = str(wheel.resolve())
             if w not in sys.path:
                 sys.path.insert(0, w)
-                ADDED.append(w)
         
         return importlib.import_module(import_name)
 
 # runtime imports
-tabulate = ensure_wheel("tabulate")
-discord = ensure_wheel("discord.py", import_name="discord")
+tabulate = ensure_wheel("tabulate", dest=DEPS_LOCATION)
+discord = ensure_wheel("discord.py", import_name="discord", dest=DEPS_LOCATION)
 from discord.ext import commands
 
 DISCORD_TOKEN = Path("E:\\CompSci\\lenny_token.txt").read_text(encoding="utf-8")
@@ -77,13 +77,10 @@ TODO: Interesting stuff to add:
 """
 
 try:
-    print("Loading discord bot")
     intents = discord.Intents.default()
     intents.message_content = True
     bot = commands.Bot(command_prefix="!", intents=intents)
 except Exception as e:
-    print("Error loading discord bot")
-    print(str(e))
     exit(1)
 
 def main():    
@@ -375,8 +372,11 @@ def display_services(svc_state="ALL"):
     return tabulate.tabulate(table, headers=["Service Name", "Display Name", "State"], tablefmt="github")
 
 def do_exit():
-    # Any cleanup stuff can go here
-    exit()
+    path = Path(DEPS_LOCATION)
+    if path.exists() and path.is_dir():
+        shutil.rmtree(path)
+
+    exit(0)
 
 async def send_message_wrapper(channel, output, is_file=False, prefix="```", suffix="```"):
     if is_file:
