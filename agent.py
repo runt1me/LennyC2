@@ -6,7 +6,9 @@
 """
 
 import ctypes
+import glob
 import json
+import importlib
 import os
 import platform
 import random
@@ -14,11 +16,49 @@ import re
 import socket
 import string
 import subprocess
+import sys
 from datetime import timedelta
 from pathlib import Path
-from tabulate import tabulate  # pip install tabulate
 
-import discord
+ADDED = []
+
+def ensure_wheel(package_name, import_name=None, dest=".deps"):
+    dest_path = Path(dest)
+    dest_path.mkdir(exist_ok=True)
+
+    if import_name is None:
+        import_name = package_name.replace("-", "_").replace(".", "_")
+
+    if str(dest_path) not in sys.path:
+        sys.path.insert(0, str(dest_path))
+
+    try:
+        return importlib.import_module(import_name)
+    except ImportError:
+        if "discord" in package_name:
+            subprocess.check_call([
+                sys.executable, "-m", "pip", "install",
+                "--upgrade", "--target", str(dest_path), package_name
+            ])
+            # Need to handle discord differently due to the way it does submodule imports
+        else:
+            # Download wheel into current directory
+            subprocess.check_call([
+                sys.executable, "-m", "pip", "download", "--dest", str(dest_path), package_name
+            ])
+
+        # Find wheel and add to sys.path
+        for wheel in dest_path.glob("*.whl"):
+            w = str(wheel.resolve())
+            if w not in sys.path:
+                sys.path.insert(0, w)
+                ADDED.append(w)
+        
+        return importlib.import_module(import_name)
+
+# runtime imports
+tabulate = ensure_wheel("tabulate")
+discord = ensure_wheel("discord.py", import_name="discord")
 from discord.ext import commands
 
 DISCORD_TOKEN = Path("E:\\CompSci\\lenny_token.txt").read_text(encoding="utf-8")
@@ -37,10 +77,13 @@ TODO: Interesting stuff to add:
 """
 
 try:
+    print("Loading discord bot")
     intents = discord.Intents.default()
     intents.message_content = True
     bot = commands.Bot(command_prefix="!", intents=intents)
-except:
+except Exception as e:
+    print("Error loading discord bot")
+    print(str(e))
     exit(1)
 
 def main():    
@@ -329,7 +372,7 @@ def display_services(svc_state="ALL"):
         services = [s for s in get_services() if s.get("STATE") == svc_state]
 
     table = [(s["SERVICE_NAME"], s.get("DISPLAY_NAME", ""), s.get("STATE", "")) for s in services]
-    return tabulate(table, headers=["Service Name", "Display Name", "State"], tablefmt="github")
+    return tabulate.tabulate(table, headers=["Service Name", "Display Name", "State"], tablefmt="github")
 
 def do_exit():
     # Any cleanup stuff can go here
