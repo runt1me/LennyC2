@@ -66,12 +66,14 @@ tabulate = ensure_wheel("tabulate", dest=DEPS_LOCATION)
 discord = ensure_wheel("discord.py", import_name="discord", dest=DEPS_LOCATION)
 from discord.ext import commands
 
-DISCORD_TOKEN = Path("E:\\CompSci\\lenny_token.txt").read_text(encoding="utf-8")
 CHECKIN_CHANNELS = set()
 LOCKFILE = Path("C:\\Windows\\Temp\\dbtagt.tmp")
 JSON_FORMAT_PREFIX = "```json\n"
-BOT_LISTEN_FOR_ID = 558898662772572160
-
+BOT_LISTEN_FOR_ID = int(input("Enter ID: "))
+if not BOT_LISTEN_FOR_ID:
+    print("ID is required.")
+    exit(1)
+    
 try:
     intents = discord.Intents.default()
     intents.message_content = True
@@ -79,8 +81,13 @@ try:
 except Exception as e:
     exit(1)
 
-def main():    
-    bot.run(DISCORD_TOKEN)
+def main():
+    token = input("Enter the discord bot token: ")
+    if not token:
+        print("Token is required.")
+        exit(1)
+    
+    bot.run(token)
 
 def random_alphanumeric(length):
     characters = string.ascii_letters + string.digits
