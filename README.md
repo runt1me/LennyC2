@@ -1,7 +1,14 @@
 # LennyC2
 Simple C2 framework written in Python. No crazy evasion or wacky and 1337 hacker features. Just basic python, with the ability to run commands and make API calls.
 
-LennyC2 is currently in the "aspirational" phase of it's design and is not yet battle-tested for serious hacking.
+Currently, all command-and-control is done in Discord. Other [LOTS](https://lots-project.com/) C2 sites may be added in the future. Ping me if you are interested in a particular C2 idea.
+
+Features include:
+- Each agent will create its own channel in your Discord server
+- Get files from target (will be saved as attachments in your server)
+- Put files to target by attaching them to your Discord thread. These will ultimately served by the Discord CDN when they are downloaded.
+- Run system commands by prepending `exec`: `exec whoami`
+- Basic filesystem traversal, e.g. `pwd`, `cd`, `ls`
 
 ## Usage
 If needed, run the stager.ps1 script to install python:
