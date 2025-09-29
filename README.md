@@ -14,13 +14,15 @@ Features include:
 If needed, run the stager.ps1 script to install python:
 `PS > .\stager.ps1`
 
-As LennyC2 is intended to be deployed to (authorized) pen-test/red-team targets, and not our own systems, discord-server related secrets are read from STDIN in an attempt to protect them. The secrets will live in memory in the python process (they must in order for the program to work), but will not be easily visible on process command lines or in logs. First, create a file, `secrets.txt`, with two lines. The DISCORD_USER_ID is the user ID for the account that will be issuing commands to the agent. The DISCORD_BOT_TOKEN is just the normal discord bot token. More information on how to find these values can be found [here](https://infosecwriteups.com/using-discord-as-a-c2-cf90b3480689)
+As LennyC2 is intended to be deployed to (authorized) pen-test/red-team targets, and not our own systems, discord-server related secrets are read from STDIN in an attempt to protect them. The secrets will live in memory in the python process (they must in order for the program to work), but will not be easily visible on process command lines or in logs. First, create a file, `secrets.txt`, with two lines. The DISCORD_USER_ID is the user ID for the account that will be issuing commands to the agent. The DISCORD_BOT_TOKEN is just the normal discord bot token.
 ```
 DISCORD_USER_ID
 DISCORD_BOT_TOKEN
 ```
 
-Then, deploy and run the agent:
+More information on how to find these values can be found [here](https://infosecwriteups.com/using-discord-as-a-c2-cf90b3480689). Do note that LennyC2 uses the user ID, rather than the server ID, as the linked writeup suggests.
+
+Once the file has been created, you can deploy and run the agent:
 `python agent.py < secrets.txt`
 
 You can delete `secrets.txt` once the agent has started.
