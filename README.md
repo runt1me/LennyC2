@@ -49,5 +49,8 @@ OK, maybe that's too spicy of a response, but in all seriousness, I would genera
 ## Mitigating against malicious scripts
 To mitigate a malicious python script, heuristic detection actually needs to be dialed in really well. I am skeptical that many (any?) out-of-the-box EDRs will be tuned well enough to catch a python script that's only real signatureable characteristics are basic file I/O, running commands, and making HTTPS requests to well-known domains. I am not ruling out that it's possible, of course -- just difficult :)
 
+## Where does the name "Lenny" come from?
+[My wife, who is currently in law school.](https://www.law.cornell.edu/wex/rule_of_lenity)
+
 ## Disclaimer
 LennyC2 is only intended for lawful use. The author is in no way responsible for any illegal use of this software. I am also not responsible for any damages or mishaps that may happen in the course of using this software. Use at your own risk.
