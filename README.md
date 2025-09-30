@@ -1,6 +1,6 @@
 # LennyC2
 
-<img width="829" height="477" alt="image" src="https://github.com/user-attachments/assets/5752199a-ec65-49f9-afde-c177d6387711" />
+<img width="829" height="477" alt="lenny-the-mascot" src="https://github.com/user-attachments/assets/49b0f13b-96bc-4095-8517-3079c2ea5ecc" />
 
 Simple C2 framework written in Python. No crazy evasion or wacky and 1337 hacker features. Just basic python, with the ability to run commands and make API calls.
 
