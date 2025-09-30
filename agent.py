@@ -119,7 +119,7 @@ def get_device_metadata():
         "is_local_admin": is_local_admin,
         "userdomain": userdomain,
         "logonserver": logonserver,
-        "version": "0.1"
+        "version": "1.0"
     }
 
     return json.dumps(output_dict, indent=4), output_dict
