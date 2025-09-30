@@ -29,6 +29,19 @@ You can delete `secrets.txt` once the agent has started.
 
 If everything worked to this point, you should get a callback in a new channel in your Discord server.
 
+## Usage (screenshots)
+<img width="1919" height="929" alt="lenny_3" src="https://github.com/user-attachments/assets/699d3fb9-bf17-4ade-9f61-affdf838eb15" />
+
+<img width="962" height="931" alt="lenny_4" src="https://github.com/user-attachments/assets/719ab89f-1ca3-49bb-8ae9-f50182d3edbc" />
+
+<img width="962" height="785" alt="lenny_5" src="https://github.com/user-attachments/assets/da6400f7-bb14-4fb2-b8e1-f73e345477be" />
+
+<img width="961" height="781" alt="lenny_6" src="https://github.com/user-attachments/assets/73943f56-30da-44e5-b605-fc6c6176d3eb" />
+
+<img width="553" height="137" alt="lenny_7" src="https://github.com/user-attachments/assets/0d3e45f6-e257-45a9-8576-ae45ba842f24" />
+
+<img width="617" height="286" alt="lenny_8" src="https://github.com/user-attachments/assets/6b3929dd-cf8e-4f14-b623-c810a678f726" />
+
 ## Philosophy
 Lenny aims to be unique in that it is only written in scripting languages and is not compiled. Scripts are fundamentally harder to signature than binaries; there is limited metadata (no compile time information, debug metadata... ); brittle signatures like strings can easily be changed (or they can just be randomized from the start), and there is no need to worry about code signing, as e.g. Python.exe and Powershell.exe are always signed, legitimate executables. As a result, heuristic detections and pattern recognitions are generally the best defenses, e.g. signaturing "python.exe executed net.exe as a subprocess, and then made an HTTPS connection." While such heuristic defenses are absolutely possible to implement, they generally require environment-specific tuning, configuration, and monitoring to differentiate them from legitimate script behavior which varies widely across environments. As a result, they are expensive to employ properly. 
 
