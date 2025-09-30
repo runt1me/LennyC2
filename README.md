@@ -1,4 +1,7 @@
 # LennyC2
+
+<img width="829" height="477" alt="image" src="https://github.com/user-attachments/assets/5752199a-ec65-49f9-afde-c177d6387711" />
+
 Simple C2 framework written in Python. No crazy evasion or wacky and 1337 hacker features. Just basic python, with the ability to run commands and make API calls.
 
 Currently, all command-and-control is done in Discord. Other [LOTS](https://lots-project.com/) C2 sites may be added in the future. Ping me if you are interested in a particular C2 idea.
@@ -52,7 +55,7 @@ Lenny aims to be unique in that it is only written in scripting languages and is
 Run the PowerShell script called `stager.ps1` to install Python 3.11.
 
 ## This uses third-party python modules that aren't installed on my target.
-LennyC2 uses a dynamic importing system for third-party modules. Only python core is needed to bootstrap, and the third-party modules that it needs will be loaded at runtime.
+LennyC2 uses a dynamic importing system for third-party modules. Only python core is needed to bootstrap, and the third-party modules that it needs will be loaded at runtime. By default, third-party packages will be dropped into a directory called ".deps". While Lenny is running, the OS will lock many of the module files and you will not be able to remove them from disk, so if you want to remove them after running, it is recommended to use a PowerShell stager.
 
 ## Wait, I have a better idea. I'll use PyInstaller or Nuitka to compile my python into an unsigned executable that also includes a python bootloader. That will never get caught.
 [Please see here for my response](https://www.youtube.com/watch?v=5hfYJsQAhl0)
