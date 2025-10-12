@@ -437,6 +437,9 @@ async def send_message_wrapper(channel, output, is_file=False, is_dict=False, pr
 
     else:
         """Split long text into <=2000 char chunks and send sequentially."""
+        if len(output) == 0:
+            return
+        
         max_length = 2000 - len(prefix) - len(suffix)
         for i in range(0, len(output), max_length):
             chunk = output[i:i+max_length]
