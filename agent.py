@@ -246,7 +246,7 @@ async def process_put_file(attachments, message_str):
                 if len(file_list) == 1:
                     # If there is only one file in the zip, just extract the file
                     single_file = file_list[0]
-                    with zf.open(single_file) as src, open(resolved_destination_path, "wb") as dst:
+                    with zf.open(single_file, pwd=zip_password.encode()) as src, open(resolved_destination_path, "wb") as dst:
                         dst.write(src.read())
                 else:
                     # If there is more than 1 file inside, extract as normal with the folder
