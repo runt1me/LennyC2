@@ -241,7 +241,16 @@ async def process_put_file(attachments, message_str):
             # Stage encrypted zip on disk at a temp path
             await att.save(zip_temp_path)
             with pyzipper.AESZipFile(zip_temp_path, "r") as zf:
-                zf.extractall(path=resolved_destination_path, pwd=zip_password.encode())
+                file_list = [info for info in zf.infolist() if not info.is_dir()]
+
+                if len(file_list) == 1:
+                    # If there is only one file in the zip, just extract the file
+                    single_file = file_list[0]
+                    with zf.open(single_file) as src, open(resolved_destination_path, "wb") as dst:
+                        dst.write(src.read())
+                else:
+                    # If there is more than 1 file inside, extract as normal with the folder
+                    zf.extractall(path=resolved_destination_path, pwd=zip_password.encode())
                 
             os.remove(zip_temp_path)
             return f"zput: Successfully extracted to path: {resolved_destination_path}"
@@ -273,7 +282,7 @@ def resolve_path(base_cwd, dest_arg, filename):
 
     # If arg ends with a path separator OR points to an existing dir -> treat as dir
     if raw.endswith(("\\", "/")) or (p.exists() and p.is_dir()):
-        p = p / att_name
+        p = p / filename
 
     # Resolve even if it doesn't exist yet
     return p.resolve(strict=False)
