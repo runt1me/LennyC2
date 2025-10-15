@@ -19,6 +19,7 @@ import string
 import subprocess
 import sys
 import tempfile
+import time
 import uuid
 from datetime import timedelta
 from pathlib import Path
@@ -216,20 +217,47 @@ async def process_put_file(attachments, message_str):
     """
         Parse and execute put file command.
     """
-    parts = message_str.strip().split(maxsplit=1)
-    dest_arg = parts[1] if len(parts) > 1 else "."
-    base_cwd = Path.cwd()
-
     if len(attachments) > 1:
-        return "Error: Put can only process a single file."
+        return "Error: put/zput can only process a single file."
 
     att = attachments[0]
-    resolved_destination_path = resolve_path(base_cwd, dest_arg, att.filename)
-    try:
-        await att.save(resolved_destination_path)
-        return f"Put: saved attachment to {resolved_destination_path}"
-    except Exception as e:
-        return str(e)
+    parts = message_str.strip().split(maxsplit=1)
+    base_cmd = parts[0]
+    base_cwd = Path.cwd()
+
+    if base_cmd == "zput":
+        # Drop zip file to disk
+        # Split again to grab the password from the command
+        args_list = parts[1].split()
+        if len(args_list) != 2:
+            return "Usage: zput <path to extract at> <zipfile password>"
+        
+        zip_password = args_list[1].strip()
+        zip_temp_path = os.path.join(tempfile.gettempdir(), f"{uuid.uuid4().hex}.zip")
+        try:
+            dest_arg = args_list[0]
+            resolved_destination_path = resolve_path(base_cwd, dest_arg, att.filename)
+
+            # Stage encrypted zip on disk at a temp path
+            await att.save(zip_temp_path)
+            with pyzipper.AESZipFile(zip_temp_path, "r") as zf:
+                zf.extractall(path=resolved_destination_path, pwd=zip_password.encode())
+                
+            os.remove(zip_temp_path)
+            return f"zput: Successfully extracted to path: {resolved_destination_path}"
+
+        except Exception as e:
+            return str(e)
+
+    elif base_cmd == "put":
+        dest_arg = parts[1] if len(parts) > 1 else "."
+
+        resolved_destination_path = resolve_path(base_cwd, dest_arg, att.filename)
+        try:
+            await att.save(resolved_destination_path)
+            return f"put: saved attachment to {resolved_destination_path}"
+        except Exception as e:
+            return str(e)
 
 def resolve_path(base_cwd, dest_arg, filename):
     """
@@ -394,7 +422,7 @@ def get_content_zipped(upload):
             raise FileNotFoundError(f"Path not found: {src_path}")
 
     return {
-        "zipfile": discord.File(zip_path, filename="content.zip"),
+        "zipfile": discord.File(zip_path, filename=f"content-{int(time.time())}.zip"),
         "password": password
     }
 
@@ -483,10 +511,11 @@ async def on_message(message):
         return
 
     if(message.author.id == BOT_LISTEN_FOR_ID):
-        if message.content.strip().lower().startswith("put"):
+        if (message.content.strip().lower().startswith("put") or 
+            message.content.strip().lower().startswith("zput")):
             if not message.attachments:
-                # If the user typed put but didnt attach anything, error
-                output = "Error: you must attach a file with the 'put' command."
+                # If the user typed put/zput but didnt attach anything, error
+                output = "Error: you must attach a file with the 'put'/'zput' command."
             else:
                 output = await process_put_file(message.attachments, message.content)
 
@@ -501,7 +530,7 @@ async def on_message(message):
             await send_message_wrapper(message.channel, output, is_file=True)
         if isinstance(output, dict):
             await send_message_wrapper(message.channel, output, is_dict=True)
-            os.remove(output.get("zipfile"))
+            os.remove(output.get("zipfile").fp.name)
         else:
             await send_message_wrapper(message.channel, output)
 
